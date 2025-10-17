@@ -42,6 +42,13 @@ export const TutorialGenerator = () => {
       setCurrentAgent("CodeAnalyzer Agent - Analyzing repository structure...");
       toast.info("📊 CodeAnalyzer Agent is analyzing the codebase");
       
+      // Simulate delay to show agent status
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Step 3: Teacher Agent
+      setCurrentAgent("Teacher Agent - Generating educational tutorial...");
+      toast.info("👨‍🏫 Teacher Agent is creating your tutorial");
+      
       // Use the multi-agent orchestrator
       const result = await agentOrchestrator.generateTutorial(repoUrl);
       
