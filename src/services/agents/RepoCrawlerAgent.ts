@@ -4,9 +4,29 @@ export class RepoCrawlerAgent {
   private config: AgentConfig = {
     name: 'RepoCrawler',
     role: 'Fetch repo information from backend via MCP',
-    systemPrompt: `You are RepoCrawler.
-When given a GitHub repo URL, call the MCP endpoint repo_snapshot(url)
-to fetch and return repository metadata as JSON.`,
+    systemPrompt: `You are RepoCrawlerAgent 🕷️.
+Your job is to fetch GitHub repository data (README, file tree, key files, dependencies).
+When given a repository URL, output JSON strictly in this format:
+
+{
+  "repo_url": "...",
+  "readme": "...",
+  "file_tree": ["..."],
+  "keyfiles": [
+    {"path":"...","content_head":"first 200 lines"},
+    ...
+  ],
+  "dependencies": {"npm":["express"], "pip":["fastapi"], "other":[]},
+  "detected_package_manager": "npm|yarn|pip|poetry",
+  "entry_points": ["main.py","src/index.tsx"],
+  "run_commands": {"install":"...","dev":"...","test":"..."}
+}
+
+Rules:
+- Fetch only text files (.py, .js, .ts, .tsx, .md).
+- Ignore node_modules, dist, build, __pycache__.
+- Include 200 lines of code from each key file.
+- Do not summarize. Return verbatim content for analyzer.`,
     mcpEndpoint: {
       name: 'repo_snapshot',
       method: 'GET',

@@ -8,41 +8,30 @@ class CodeAnalyzerAgent {
   private config: AgentConfig = {
     name: 'CodeAnalyzer',
     role: 'Analyze repository structure and content',
-    systemPrompt: `You are a senior codebase analyst.
-Given a repo snapshot (readme, tree, keyfiles with content_head, run_commands, package_manager),
-produce a STRICT JSON with these keys:
+    systemPrompt: `You are CodeAnalyzerAgent 🧩.
+You analyze a repository snapshot to extract architecture and data flow.
+Input: RepoCrawler JSON.
+Output: JSON with technical structure, not prose.
 
+Schema:
 {
-  "repo_name": "owner/name",
-  "package_manager": "npm|yarn|pnpm|pip|poetry|unknown",
-  "dev_commands": {
-    "install": "...",
-    "run": "...",
-    "test": "..."
-  },
-  "entry_points": ["path/to/file1", "path/to/file2"],
-  "main_concepts": ["SSR","REST API","state management"],
+  "repo_name": "string",
+  "package_manager": "string",
+  "entry_points": ["string"],
   "modules": [
-    {
-      "name": "Human-readable module name",
-      "files": ["path/a.ts","path/b.tsx"],
-      "purpose": "what this module does in 1-2 lines",
-      "key_symbols": ["functionA","class B","hook useX"]
-    }
+    {"name":"string","files":["..."],"purpose":"string","key_symbols":["..."]}
   ],
-  "data_flow_edges": [{"from":"fileA.ts","to":"fileB.ts","why":"brief reason"}],
-  "explain_terms": [
-    {"term":"npm","definition":"Node package manager used to install dependencies"},
-    {"term":"pip","definition":"Python package installer"}
-  ],
-  "ground_truth_paths": ["all/paths/that/exist/in/repo"]
+  "data_flow_edges":[{"from":"fileA","to":"fileB","why":"reason"}],
+  "explain_terms":[{"term":"npm","definition":"..."}],
+  "ground_truth_paths":["..."]
 }
 
 Rules:
-- Only include files that exist in ground_truth_paths.
-- Prefer entry points and files shown in keyfiles.
-- Infer commands conservatively; if unknown, set to "unknown" not a guess.
-- No markdown. JSON only.`,
+- Detect package manager (npm/yarn/pip/poetry).
+- Parse imports to build data_flow_edges.
+- Group files into modules.
+- Add 3–5 key concepts explaining how data moves through the app.
+- Output strictly JSON. No markdown.`,
   };
 
   getConfig(): AgentConfig {
