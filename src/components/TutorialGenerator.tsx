@@ -2,15 +2,17 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Github, Loader2, FileText } from "lucide-react";
+import { Github, Loader2, FileText, Brain } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { agentOrchestrator } from "@/services/AgentOrchestrator";
 
 export const TutorialGenerator = () => {
   const [repoUrl, setRepoUrl] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [tutorial, setTutorial] = useState("");
+  const [currentAgent, setCurrentAgent] = useState<string>("");
 
   const handleGenerate = async () => {
     if (!repoUrl.trim()) {
@@ -26,54 +28,31 @@ export const TutorialGenerator = () => {
     }
 
     setIsGenerating(true);
+    setTutorial("");
     
-    // Mock tutorial generation (will be replaced with actual multi-agent system)
-    setTimeout(() => {
-      const mockTutorial = `# Tutorial: Understanding ${repoUrl.split('/').pop()}
-
-## Overview
-This repository contains a well-structured codebase that demonstrates several key concepts.
-
-## Architecture
-The project follows a modular architecture with clear separation of concerns:
-
-- **Components**: Reusable UI elements
-- **Services**: Business logic and API interactions
-- **Utils**: Helper functions and utilities
-
-## Key Features
-1. **Feature One**: Description of the first major feature
-2. **Feature Two**: Description of the second major feature
-3. **Feature Three**: Description of the third major feature
-
-## Code Structure
-\`\`\`
-src/
-├── components/
-├── services/
-├── utils/
-└── index.js
-\`\`\`
-
-## Getting Started
-To work with this codebase:
-
-1. Clone the repository
-2. Install dependencies
-3. Start the development server
-
-## Best Practices
-- Follow the existing code style
-- Write comprehensive tests
-- Document your changes
-
-*Note: This is a placeholder tutorial. The actual multi-agent analysis will be implemented in the next steps.*
-`;
+    try {
+      // Step 1: RepoCrawler Agent
+      setCurrentAgent("RepoCrawler Agent - Fetching repository data...");
+      toast.info("🧠 RepoCrawler Agent is analyzing the repository");
       
-      setTutorial(mockTutorial);
+      // Use the multi-agent orchestrator
+      const result = await agentOrchestrator.generateTutorial(repoUrl);
+      
+      if (!result.success) {
+        throw new Error(result.error || "Failed to generate tutorial");
+      }
+      
+      setTutorial(result.tutorial || "");
+      setCurrentAgent("");
+      toast.success("✅ Tutorial generated successfully!");
+      
+    } catch (error) {
+      console.error("Error generating tutorial:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to generate tutorial");
+      setCurrentAgent("");
+    } finally {
       setIsGenerating(false);
-      toast.success("Tutorial generated successfully!");
-    }, 2500);
+    }
   };
 
   return (
@@ -109,7 +88,7 @@ To work with this codebase:
                   </>
                 ) : (
                   <>
-                    <FileText className="w-4 h-4" />
+                    <Brain className="w-4 h-4" />
                     Generate Tutorial
                   </>
                 )}
@@ -117,19 +96,30 @@ To work with this codebase:
             </div>
           </div>
 
+          {/* Agent Status */}
+          {isGenerating && currentAgent && (
+            <div className="pt-2 border-t border-border/50">
+              <div className="flex items-center gap-2 text-sm">
+                <Brain className="w-4 h-4 text-primary animate-pulse" />
+                <span className="text-muted-foreground">{currentAgent}</span>
+              </div>
+            </div>
+          )}
+
           {/* Example Link */}
-          <div className="pt-2 border-t border-border/50">
-            <p className="text-xs text-muted-foreground">
-              Try example:{" "}
-              <button
-                onClick={() => setRepoUrl("https://github.com/facebook/react")}
-                className="text-primary hover:text-primary-glow font-mono transition-colors underline"
-                disabled={isGenerating}
-              >
-                facebook/react
-              </button>
-            </p>
-          </div>
+          {!isGenerating && (
+            <div className="pt-2 border-t border-border/50">
+              <p className="text-xs text-muted-foreground">
+                Try example:{" "}
+                <button
+                  onClick={() => setRepoUrl("https://github.com/facebook/react")}
+                  className="text-primary hover:text-primary-glow font-mono transition-colors underline"
+                >
+                  facebook/react
+                </button>
+              </p>
+            </div>
+          )}
         </div>
       </Card>
 
