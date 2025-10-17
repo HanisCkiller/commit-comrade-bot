@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Target, BookOpen, Code, Sparkles, Trophy, Clock, GraduationCap } from "lucide-react";
+import { CheckCircle2, Target, BookOpen, Code, Sparkles, Trophy, Clock, GraduationCap, Terminal, FileCode, GitBranch, Edit, Wrench, AlertCircle } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 interface LearningJourneyData {
@@ -9,30 +9,55 @@ interface LearningJourneyData {
   difficulty_level: string;
   estimated_duration: string;
   prerequisites: string[];
-  learning_objectives: string[];
+  glossary: GlossaryTerm[];
   learning_path: LearningStage[];
-  final_project: {
-    goal: string;
-    description: string;
-    expected_learning: string[];
-  };
+}
+
+interface GlossaryTerm {
+  term: string;
+  explain_like_im_5: string;
+  when_to_use: string;
+  common_pitfall: string;
 }
 
 interface LearningStage {
   stage: string;
   goal: string;
   concepts: string[];
-  steps: string[];
-  checkpoint: string;
+  steps: LearningStep[];
+  checkpoint?: string;
   quiz?: QuizQuestion[];
   mini_challenge?: string;
   final_challenge?: string;
+}
+
+interface LearningStep {
+  title: string;
+  type: 'command' | 'code_reading' | 'trace' | 'code_mod' | 'scaffold';
+  commands?: string[];
+  file_path?: string;
+  snippet?: string;
+  explanation?: string;
+  why?: string;
+  check_yourself?: string;
+  why_it_matters?: string;
+  edges?: Array<{ from: string; to: string; why: string }>;
+  diff?: string;
+  file_path_suggestion?: string;
+  skeleton_code?: string;
+  verify?: {
+    method: string;
+    expect?: string[];
+    url_hint?: string;
+    fallback_tip?: string;
+  };
 }
 
 interface QuizQuestion {
   question: string;
   options: string[];
   answer: string;
+  why?: string;
 }
 
 interface LearningJourneyProps {
@@ -47,6 +72,153 @@ export const LearningJourney = ({ data }: LearningJourneyProps) => {
       case 'advanced': return 'bg-red-500/10 text-red-400 border-red-500/20';
       default: return 'bg-primary/10 text-primary border-primary/20';
     }
+  };
+
+  const getStepIcon = (type: string) => {
+    switch (type) {
+      case 'command': return <Terminal className="w-5 h-5 text-primary" />;
+      case 'code_reading': return <FileCode className="w-5 h-5 text-primary" />;
+      case 'trace': return <GitBranch className="w-5 h-5 text-primary" />;
+      case 'code_mod': return <Edit className="w-5 h-5 text-primary" />;
+      case 'scaffold': return <Wrench className="w-5 h-5 text-primary" />;
+      default: return <Code className="w-5 h-5 text-primary" />;
+    }
+  };
+
+  const renderStep = (step: LearningStep, idx: number) => {
+    return (
+      <Card key={idx} className="p-4 bg-secondary/20 border-secondary/30">
+        <div className="flex items-start gap-3 mb-3">
+          {getStepIcon(step.type)}
+          <div className="flex-1">
+            <h5 className="font-semibold text-foreground">{step.title}</h5>
+            <Badge variant="outline" className="mt-1 text-xs">{step.type}</Badge>
+          </div>
+        </div>
+
+        {/* Commands */}
+        {step.commands && step.commands.length > 0 && (
+          <div className="mt-3 p-3 bg-black/50 rounded-lg border border-primary/20">
+            <code className="text-sm text-green-400 font-mono">
+              {step.commands.map((cmd, i) => (
+                <div key={i}>$ {cmd}</div>
+              ))}
+            </code>
+          </div>
+        )}
+
+        {/* File Path */}
+        {step.file_path && (
+          <div className="mt-3">
+            <p className="text-xs text-muted-foreground mb-1">File:</p>
+            <code className="text-sm text-primary font-mono bg-primary/10 px-2 py-1 rounded">
+              {step.file_path}
+            </code>
+          </div>
+        )}
+
+        {/* Snippet */}
+        {step.snippet && (
+          <div className="mt-3 p-3 bg-black/50 rounded-lg border border-primary/20 overflow-x-auto">
+            <pre className="text-xs text-gray-300 font-mono whitespace-pre">{step.snippet}</pre>
+          </div>
+        )}
+
+        {/* Explanation */}
+        {step.explanation && (
+          <p className="mt-3 text-sm text-muted-foreground">{step.explanation}</p>
+        )}
+
+        {/* Why */}
+        {step.why && (
+          <div className="mt-3 p-2 bg-primary/5 rounded border-l-2 border-primary">
+            <p className="text-sm text-muted-foreground"><strong className="text-foreground">Why:</strong> {step.why}</p>
+          </div>
+        )}
+
+        {/* Check Yourself */}
+        {step.check_yourself && (
+          <div className="mt-3 p-2 bg-accent/5 rounded border-l-2 border-accent">
+            <p className="text-sm text-muted-foreground"><strong className="text-foreground">Check yourself:</strong> {step.check_yourself}</p>
+          </div>
+        )}
+
+        {/* Why It Matters */}
+        {step.why_it_matters && (
+          <div className="mt-3 p-2 bg-secondary/30 rounded">
+            <p className="text-sm text-muted-foreground"><strong className="text-foreground">Why it matters:</strong> {step.why_it_matters}</p>
+          </div>
+        )}
+
+        {/* Trace Edges */}
+        {step.edges && step.edges.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {step.edges.map((edge, i) => (
+              <div key={i} className="flex items-center gap-2 text-sm">
+                <code className="text-primary font-mono text-xs">{edge.from}</code>
+                <span className="text-muted-foreground">→</span>
+                <code className="text-primary font-mono text-xs">{edge.to}</code>
+                <span className="text-xs text-muted-foreground">({edge.why})</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Diff */}
+        {step.diff && (
+          <div className="mt-3 p-3 bg-black/50 rounded-lg border border-accent/20">
+            <pre className="text-xs font-mono whitespace-pre">{step.diff}</pre>
+          </div>
+        )}
+
+        {/* Skeleton Code */}
+        {step.skeleton_code && (
+          <div className="mt-3 p-3 bg-black/50 rounded-lg border border-primary/20 overflow-x-auto">
+            <pre className="text-xs text-gray-300 font-mono whitespace-pre">{step.skeleton_code}</pre>
+          </div>
+        )}
+
+        {/* File Path Suggestion */}
+        {step.file_path_suggestion && (
+          <div className="mt-3">
+            <p className="text-xs text-muted-foreground mb-1">Suggested path:</p>
+            <code className="text-sm text-accent font-mono bg-accent/10 px-2 py-1 rounded">
+              {step.file_path_suggestion}
+            </code>
+          </div>
+        )}
+
+        {/* Verify */}
+        {step.verify && (
+          <div className="mt-3 p-3 bg-green-500/10 rounded border border-green-500/20">
+            <div className="flex items-start gap-2">
+              <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-green-400 mb-1">Verify ({step.verify.method})</p>
+                {step.verify.expect && (
+                  <ul className="text-xs text-muted-foreground space-y-1">
+                    {step.verify.expect.map((exp, i) => (
+                      <li key={i}>• {exp}</li>
+                    ))}
+                  </ul>
+                )}
+                {step.verify.url_hint && (
+                  <p className="text-xs text-muted-foreground mt-1">URL: {step.verify.url_hint}</p>
+                )}
+                {step.verify.fallback_tip && (
+                  <div className="mt-2 p-2 bg-orange-500/10 rounded border border-orange-500/20">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-3 h-3 text-orange-400 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-orange-300">{step.verify.fallback_tip}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </Card>
+    );
   };
 
   return (
@@ -85,7 +257,7 @@ export const LearningJourney = ({ data }: LearningJourneyProps) => {
         </div>
       </Card>
 
-      {/* Prerequisites & Objectives Grid */}
+      {/* Prerequisites & Glossary Grid */}
       <div className="grid md:grid-cols-2 gap-6">
         {/* Prerequisites */}
         <Card className="p-6">
@@ -103,20 +275,37 @@ export const LearningJourney = ({ data }: LearningJourneyProps) => {
           </ul>
         </Card>
 
-        {/* Learning Objectives */}
+        {/* Glossary */}
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-foreground">
-            <Target className="w-5 h-5 text-primary" />
-            Learning Objectives
+            <Sparkles className="w-5 h-5 text-primary" />
+            Glossary
           </h3>
-          <ul className="space-y-2">
-            {data.learning_objectives.map((objective, idx) => (
-              <li key={idx} className="flex items-center gap-2 text-muted-foreground">
-                <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
-                <span>{objective}</span>
-              </li>
+          <Accordion type="single" collapsible className="space-y-2">
+            {data.glossary.map((term, idx) => (
+              <AccordionItem key={idx} value={`term-${idx}`} className="border border-secondary/30 rounded-lg px-3">
+                <AccordionTrigger className="py-2 hover:no-underline">
+                  <span className="text-sm font-semibold text-primary">{term.term}</span>
+                </AccordionTrigger>
+                <AccordionContent className="pb-3">
+                  <div className="space-y-2 text-xs">
+                    <div>
+                      <p className="font-semibold text-foreground">ELI5:</p>
+                      <p className="text-muted-foreground">{term.explain_like_im_5}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-foreground">When to use:</p>
+                      <p className="text-muted-foreground">{term.when_to_use}</p>
+                    </div>
+                    <div className="p-2 bg-orange-500/10 rounded border border-orange-500/20">
+                      <p className="font-semibold text-orange-400">Common pitfall:</p>
+                      <p className="text-orange-300">{term.common_pitfall}</p>
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
             ))}
-          </ul>
+          </Accordion>
         </Card>
       </div>
 
@@ -160,28 +349,23 @@ export const LearningJourney = ({ data }: LearningJourneyProps) => {
                     </div>
 
                     {/* Steps */}
-                    <div>
-                      <h4 className="text-sm font-semibold mb-3 text-foreground">Steps</h4>
-                      <ol className="space-y-2">
-                        {stage.steps.map((step, i) => (
-                          <li key={i} className="flex gap-3 text-muted-foreground">
-                            <span className="text-primary font-semibold flex-shrink-0">{i + 1}.</span>
-                            <span>{step}</span>
-                          </li>
-                        ))}
-                      </ol>
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-semibold text-foreground">Steps</h4>
+                      {stage.steps.map((step, i) => renderStep(step, i))}
                     </div>
 
                     {/* Checkpoint */}
-                    <Card className="p-4 bg-primary/5 border-primary/20">
-                      <div className="flex items-start gap-3">
-                        <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                        <div>
-                          <h4 className="text-sm font-semibold mb-1 text-foreground">Checkpoint</h4>
-                          <p className="text-sm text-muted-foreground">{stage.checkpoint}</p>
+                    {stage.checkpoint && (
+                      <Card className="p-4 bg-primary/5 border-primary/20">
+                        <div className="flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                          <div>
+                            <h4 className="text-sm font-semibold mb-1 text-foreground">Checkpoint</h4>
+                            <p className="text-sm text-muted-foreground">{stage.checkpoint}</p>
+                          </div>
                         </div>
-                      </div>
-                    </Card>
+                      </Card>
+                    )}
 
                     {/* Quiz */}
                     {stage.quiz && stage.quiz.length > 0 && (
@@ -197,7 +381,10 @@ export const LearningJourney = ({ data }: LearningJourneyProps) => {
                                 </li>
                               ))}
                             </ul>
-                            <p className="text-xs text-primary/70 mt-2">Answer: {q.answer}</p>
+                            <div className="mt-2 p-2 bg-primary/10 rounded">
+                              <p className="text-xs text-primary font-semibold">Answer: {q.answer}</p>
+                              {q.why && <p className="text-xs text-muted-foreground mt-1">{q.why}</p>}
+                            </div>
                           </div>
                         ))}
                       </Card>
@@ -226,29 +413,6 @@ export const LearningJourney = ({ data }: LearningJourneyProps) => {
           ))}
         </Accordion>
       </div>
-
-      {/* Final Project */}
-      <Card className="p-6 border-accent/30 bg-gradient-to-br from-accent/5 to-primary/5">
-        <div className="flex items-start gap-4">
-          <div className="p-3 rounded-xl bg-accent/20 border border-accent/30">
-            <Trophy className="w-6 h-6 text-accent" />
-          </div>
-          <div className="flex-1">
-            <h2 className="text-2xl font-bold mb-2 gradient-text">{data.final_project.goal}</h2>
-            <p className="text-muted-foreground mb-4 leading-relaxed">{data.final_project.description}</p>
-            
-            <h3 className="text-sm font-semibold mb-2 text-foreground">Expected Learning Outcomes</h3>
-            <ul className="space-y-2">
-              {data.final_project.expected_learning.map((outcome, idx) => (
-                <li key={idx} className="flex items-center gap-2 text-muted-foreground">
-                  <Sparkles className="w-4 h-4 text-accent flex-shrink-0" />
-                  <span>{outcome}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </Card>
     </div>
   );
 };

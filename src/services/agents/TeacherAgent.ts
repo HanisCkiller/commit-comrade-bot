@@ -8,24 +8,58 @@ class TeacherAgent {
   private config: AgentConfig = {
     name: 'Teacher',
     role: 'Generate interactive learning journeys',
-    systemPrompt: `You are CodeSensei 🥷 — a wise AI coding mentor who transforms open-source repositories into immersive, hands-on learning journeys.
+    systemPrompt: `You are CodeSensei 🥷, an AI mentor. Convert the analyzer JSON into a HANDS-ON curriculum.
 
-Your goal: Teach the user to **understand, modify, and master** this repository step by step — just like Codecrafters or Buildspace.
+OUTPUT STRICT JSON with this schema (no markdown, no commentary):
+{
+  "project_title": "string",
+  "overview": "2-3 sentences",
+  "difficulty_level": "beginner|intermediate|advanced",
+  "estimated_duration": "e.g. 2-3 hours",
+  "prerequisites": ["..."],
+  "glossary": [
+    {"term":"npm","explain_like_im_5":"...", "when_to_use":"...", "common_pitfall":"..."},
+    {"term":"pip","explain_like_im_5":"...", "when_to_use":"...", "common_pitfall":"..."}
+  ],
+  "learning_path": [
+    {
+      "stage": "Setup & Run",
+      "goal": "Run locally",
+      "concepts": ["installation","env"],
+      "steps": [
+        {
+          "title": "Install dependencies",
+          "type": "command",
+          "commands": ["<from analyzer.dev_commands.install>"],
+          "why": "Why this is needed in this stack",
+          "verify": {
+            "method": "terminal_output_contains",
+            "expect": ["added X packages","..."],
+            "fallback_tip": "If fails, delete lockfile and retry"
+          }
+        },
+        {
+          "title": "Open the entry point",
+          "type": "code_reading",
+          "file_path": "<from analyzer.entry_points[0]>",
+          "snippet": "first 30-60 lines from snapshot.keyfiles.content_head",
+          "explanation": "Explain what happens line-by-line at a high level",
+          "check_yourself": "Ask: where is the first render/handler called?"
+        }
+      ],
+      "quiz": [
+        {"question":"Which package manager is used?","options":["npm","yarn","pip","poetry"],"answer":"<from analyzer.package_manager>","why":"Explain difference"}
+      ]
+    }
+  ]
+}
 
-Design a **structured Learning Journey** for a developer who wants to master this project *by building and experimenting*, not just reading.
-
-Generate a **JSON output** that represents a full interactive course with stages, checkpoints, quizzes, and mini-challenges.
-
-STYLE:
-- Use concise but encouraging language.
-- Avoid overwhelming details; focus on learning by doing.
-- Each stage should feel like a mini-level in a coding game.
-- Use terminology accessible to junior developers.
-
-OUTPUT REQUIREMENTS:
-- Strictly output valid JSON (no Markdown, no commentary).
-- Keep learning_path around 3–5 stages.
-- Include quizzes and mini-challenges for engagement.`,
+HARD CONSTRAINTS:
+- Use ONLY file paths that exist in analyzer.ground_truth_paths.
+- For any code snippet, take from snapshot.keyfiles.content_head of the SAME file. Do not invent APIs.
+- If a command is unknown in analyzer.dev_commands, set commands to ["<unknown>"] and add a fallback_tip.
+- Keep each step laser-specific and actionable; avoid generic advice like "understand X".
+- JSON only. No markdown. No extra text.`,
   };
 
   getConfig(): AgentConfig {
@@ -63,10 +97,10 @@ OUTPUT REQUIREMENTS:
   }
 
   /**
-   * Create an interactive learning journey in JSON format
+   * Create a hands-on curriculum in JSON format
    */
   private createTutorial(repoData: RepoSnapshot, analysisData: any): string {
-    const { metadata } = repoData;
+    const { metadata, keyFiles } = repoData;
     const { 
       repo_name, 
       package_manager, 
@@ -74,44 +108,36 @@ OUTPUT REQUIREMENTS:
       entry_points, 
       main_concepts, 
       modules, 
-      explain_terms 
+      explain_terms,
+      data_flow_edges,
+      ground_truth_paths
     } = analysisData;
 
     const difficultyLevel = this.determineDifficulty(main_concepts, modules);
     const prerequisites = this.generatePrerequisites(main_concepts, package_manager);
-    const learningPath = this.generateInteractiveLearningPath(
+    const glossary = this.buildGlossary(explain_terms, package_manager, main_concepts);
+    const learningPath = this.generateDetailedLearningPath(
       main_concepts, 
       modules, 
       entry_points, 
       dev_commands,
-      package_manager
+      package_manager,
+      data_flow_edges,
+      ground_truth_paths,
+      keyFiles
     );
 
-    const learningJourney = {
+    const curriculum = {
       project_title: repo_name || metadata?.name || 'Repository Learning Journey',
       overview: `Master ${repo_name || 'this project'} through hands-on learning. ${metadata?.description || 'Understand the architecture, run it locally, and build your own features.'}`,
       difficulty_level: difficultyLevel,
       estimated_duration: this.estimateDuration(modules?.length || 0),
       prerequisites: prerequisites,
-      learning_objectives: [
-        'Understand how the project works',
-        'Run it locally and explore the codebase',
-        'Modify key components and features',
-        'Implement a small new feature independently'
-      ],
+      glossary: glossary,
       learning_path: learningPath,
-      final_project: {
-        goal: 'Apply all learned concepts to extend the app meaningfully',
-        description: 'Add a new feature that integrates with the existing codebase (e.g., new UI component, API endpoint, or utility function).',
-        expected_learning: [
-          'Full understanding of the repository structure',
-          'Confidence modifying and extending open-source code',
-          'Ability to read, trace, and refactor complex codebases'
-        ]
-      }
     };
 
-    return JSON.stringify(learningJourney, null, 2);
+    return JSON.stringify(curriculum, null, 2);
   }
 
   /**
@@ -174,90 +200,287 @@ OUTPUT REQUIREMENTS:
   }
 
   /**
-   * Generate interactive learning path with stages
+   * Build glossary from explain_terms
    */
-  private generateInteractiveLearningPath(
+  private buildGlossary(explain_terms?: any[], packageManager?: string, main_concepts?: string[]): any[] {
+    const glossary: any[] = [];
+
+    // Add terms from analyzer
+    if (explain_terms) {
+      explain_terms.forEach(term => {
+        glossary.push({
+          term: term.term,
+          explain_like_im_5: term.definition,
+          when_to_use: this.getWhenToUse(term.term, packageManager),
+          common_pitfall: this.getCommonPitfall(term.term)
+        });
+      });
+    }
+
+    return glossary;
+  }
+
+  private getWhenToUse(term: string, packageManager?: string): string {
+    const usage: Record<string, string> = {
+      'npm': 'Use for Node.js projects to install and manage JavaScript packages',
+      'yarn': 'Alternative to npm with faster installs and better dependency resolution',
+      'pnpm': 'Use when disk space is a concern - shares packages across projects',
+      'pip': 'Use for Python projects to install libraries from PyPI',
+      'poetry': 'Use for Python projects when you need better dependency management',
+      'SSR': 'Use when SEO matters or you need faster initial page loads',
+      'REST API': 'Use for standard CRUD operations and simple client-server communication',
+      'GraphQL': 'Use when clients need flexible data fetching with complex queries',
+      'State Management': 'Use when sharing data across multiple components gets complex',
+    };
+    return usage[term] || 'Used in this project for core functionality';
+  }
+
+  private getCommonPitfall(term: string): string {
+    const pitfalls: Record<string, string> = {
+      'npm': 'Forgetting to run npm install after pulling changes with new dependencies',
+      'yarn': 'Mixing npm and yarn commands in the same project causes lockfile conflicts',
+      'pnpm': 'Some packages may not work due to strict dependency isolation',
+      'pip': 'Not using virtual environments leads to global package conflicts',
+      'poetry': 'The pyproject.toml and poetry.lock must stay in sync',
+      'SSR': 'Using browser-only APIs (like window) will break server rendering',
+      'REST API': 'Over-fetching or under-fetching data when endpoints are too generic',
+      'GraphQL': 'N+1 query problems if not using data loaders properly',
+      'State Management': 'Overusing global state when local state would suffice',
+    };
+    return pitfalls[term] || 'Watch for edge cases specific to this implementation';
+  }
+
+  /**
+   * Generate detailed learning path with typed steps
+   */
+  private generateDetailedLearningPath(
     main_concepts?: string[],
     modules?: any[],
     entry_points?: string[],
     dev_commands?: any,
-    packageManager?: string
+    packageManager?: string,
+    data_flow_edges?: any[],
+    ground_truth_paths?: string[],
+    keyFiles?: Record<string, string>
   ): any[] {
     const path: any[] = [];
 
     // Stage 1: Setup & Run
-    const installCmd = dev_commands?.install || 'unknown';
-    const runCmd = dev_commands?.run || 'unknown';
+    const installCmd = dev_commands?.install || '<unknown>';
+    const runCmd = dev_commands?.run || '<unknown>';
+    const entryFile = entry_points && entry_points.length > 0 ? entry_points[0] : 'src/index.js';
     
+    const setupSteps: any[] = [
+      {
+        title: 'Install dependencies',
+        type: 'command',
+        commands: [installCmd],
+        why: `This ${packageManager || 'package manager'} command downloads all required libraries and dependencies for the project to work`,
+        verify: {
+          method: 'terminal_output_contains',
+          expect: installCmd === '<unknown>' ? ['dependencies installed'] : ['added', 'packages', 'installed'],
+          fallback_tip: installCmd === '<unknown>' 
+            ? 'Check README for installation instructions or look for package.json/requirements.txt' 
+            : 'If this fails, delete the lockfile and try again'
+        }
+      },
+      {
+        title: 'Open the entry point',
+        type: 'code_reading',
+        file_path: entryFile,
+        snippet: this.getCodeSnippet(entryFile, keyFiles, 30),
+        explanation: 'This file is where the application starts. It typically sets up the main configuration, initializes the framework, and starts the app.',
+        check_yourself: 'Ask yourself: where is the first render or handler called? What gets executed first?'
+      },
+      {
+        title: 'Run the dev server',
+        type: 'command',
+        commands: [runCmd],
+        verify: {
+          method: 'http_check',
+          url_hint: 'http://localhost:3000 (check README or terminal output for actual port)',
+          expect: ['app loads without error', 'server is running']
+        }
+      }
+    ];
+
     path.push({
       stage: 'Setup & Run',
-      goal: 'Get the project running locally',
-      concepts: ['installation', 'dependency management', 'environment setup'],
-      steps: [
-        'Clone the repository to your local machine',
-        'Read the README.md for setup instructions',
-        `Install dependencies: ${installCmd}`,
-        `Run the development server: ${runCmd}`
-      ],
-      checkpoint: 'You can successfully run the project and see the output in your browser or terminal',
+      goal: 'Run locally',
+      concepts: ['installation', 'environment setup', 'dev server'],
+      steps: setupSteps,
       quiz: [
         {
-          question: 'Which command installs dependencies in this project?',
-          options: [installCmd, 'pip install', 'npm install', 'yarn install'].filter((v, i, a) => a.indexOf(v) === i),
-          answer: installCmd
+          question: 'Which package manager is used in this project?',
+          options: ['npm', 'yarn', 'pnpm', 'pip', 'poetry'].filter(pm => pm === packageManager || ['npm', 'yarn', 'pip'].includes(pm)),
+          answer: packageManager || 'unknown',
+          why: `${packageManager || 'This package manager'} is configured for this project. Using different package managers can cause lockfile conflicts.`
         }
       ]
     });
 
-    // Stage 2: Architecture & Core Logic
-    const entryFile = entry_points && entry_points.length > 0 ? entry_points[0] : 'the entry point file';
+    // Stage 2: Architecture & Data Flow
+    const traceSteps: any[] = [];
     
-    path.push({
-      stage: 'Architecture & Core Logic',
-      goal: 'Understand how main components interact',
-      concepts: main_concepts?.slice(0, 3) || ['code architecture', 'data flow'],
-      steps: [
-        `Open ${entryFile} to understand the app initialization`,
-        'Trace the main data flow through the application',
-        'Map out how different modules communicate',
-        'Document the architecture in a simple diagram'
-      ],
-      checkpoint: 'You can explain the project architecture and main data flow',
-      mini_challenge: 'Add a console.log or print statement in a key function and verify it executes when you interact with the app.'
-    });
+    if (data_flow_edges && data_flow_edges.length > 0) {
+      traceSteps.push({
+        title: 'Trace data flow',
+        type: 'trace',
+        edges: data_flow_edges.slice(0, 5),
+        explanation: 'Follow how data moves through the application from entry point to UI/output'
+      });
+    }
+
+    const firstModule = modules && modules.length > 0 ? modules[0] : null;
+    if (firstModule && firstModule.files && firstModule.files.length > 0) {
+      const moduleFile = firstModule.files[0];
+      traceSteps.push({
+        title: `Read the ${firstModule.name} module`,
+        type: 'code_reading',
+        file_path: moduleFile,
+        snippet: this.getCodeSnippet(moduleFile, keyFiles, 40),
+        explanation: `This module handles ${firstModule.purpose}. Look for the key functions: ${firstModule.key_symbols?.slice(0, 3).join(', ') || 'main functions'}.`,
+        why_it_matters: 'Understanding this module helps you see how the app handles core functionality'
+      });
+    }
+
+    if (traceSteps.length > 0) {
+      path.push({
+        stage: 'Architecture & Data Flow',
+        goal: 'Trace how data moves',
+        concepts: main_concepts?.slice(0, 3) || ['routing', 'data flow', 'modules'],
+        steps: traceSteps
+      });
+    }
 
     // Stage 3: Feature Exploration
-    const firstModule = modules && modules.length > 0 ? modules[0] : null;
-    path.push({
-      stage: 'Feature Exploration',
-      goal: 'Experiment with modifying a core feature',
-      concepts: ['code modification', 'testing changes', 'debugging'],
-      steps: [
-        firstModule ? `Open the ${firstModule.name} module` : 'Choose a main component to modify',
-        firstModule ? `Explore files: ${firstModule.files.slice(0, 2).join(', ')}` : 'Pick a file to modify',
-        'Make a small change (e.g., update text, change a color, modify logic)',
-        `Run ${runCmd} and verify your change appears`
-      ],
-      checkpoint: 'You successfully modified a feature and confirmed the result',
-      mini_challenge: 'Add a new button or function that logs user interaction to the console.'
-    });
+    const modSteps: any[] = [];
+    const safeFile = this.findSafeUIFile(modules, ground_truth_paths);
+    
+    if (safeFile) {
+      modSteps.push({
+        title: 'Make a harmless change',
+        type: 'code_mod',
+        file_path: safeFile,
+        diff: `# Example: Change a text string or color\n- Old: "Hello World"\n+ New: "Hello CodeSensei"`,
+        explanation: 'This is a safe change that updates visible UI without breaking functionality',
+        verify: {
+          method: 'manual_check',
+          expect: ['UI text or color changed', 'no errors in console']
+        }
+      });
+    }
+
+    if (modSteps.length > 0) {
+      path.push({
+        stage: 'Feature Exploration',
+        goal: 'Modify a real behavior safely',
+        concepts: ['code modification', 'safe changes', 'verification'],
+        steps: modSteps,
+        mini_challenge: 'Add a console.log or print statement in a function and verify it appears when you interact with the app'
+      });
+    }
 
     // Stage 4: Build Your Own
+    const scaffoldFile = this.suggestNewFilePath(modules, packageManager, ground_truth_paths);
     path.push({
       stage: 'Build Your Own',
-      goal: 'Create a small new feature from scratch',
-      concepts: ['feature implementation', 'code organization', 'best practices'],
+      goal: 'Add a small feature',
+      concepts: ['composition', 'best practices', 'integration'],
       steps: [
-        'Plan a small addition (like a new component, function, or route)',
-        'Follow the existing code patterns and conventions',
-        'Implement your feature step by step',
-        'Test it thoroughly and document what you built'
+        {
+          title: 'Create a new component or function',
+          type: 'scaffold',
+          file_path_suggestion: scaffoldFile,
+          skeleton_code: this.generateSkeletonCode(scaffoldFile, packageManager),
+          explanation: 'This creates a new reusable piece following the existing code patterns',
+          verify: {
+            method: 'code_compiles',
+            expect: ['no syntax errors', 'no TypeScript errors']
+          }
+        }
       ],
-      checkpoint: 'You build a working mini-feature using what you learned',
-      final_challenge: 'Build a feature that interacts with existing code (e.g., a new UI element that uses existing data or a utility function).'
+      final_challenge: 'Integrate your new feature into the existing app and document it in README'
     });
 
     return path;
+  }
+
+  private getCodeSnippet(filePath: string, keyFiles?: Record<string, string>, maxLines: number = 30): string {
+    if (!keyFiles || !keyFiles[filePath]) {
+      return `// Code snippet from ${filePath}\n// (View the file to see implementation details)`;
+    }
+
+    const content = keyFiles[filePath];
+    const lines = content.split('\n').slice(0, maxLines);
+    return lines.join('\n') + (lines.length >= maxLines ? '\n// ... (more code below)' : '');
+  }
+
+  private findSafeUIFile(modules?: any[], ground_truth_paths?: string[]): string | null {
+    if (!modules || !ground_truth_paths) return null;
+
+    // Look for UI components
+    const uiModule = modules.find(m => 
+      m.name.toLowerCase().includes('component') || 
+      m.name.toLowerCase().includes('ui')
+    );
+
+    if (uiModule && uiModule.files && uiModule.files.length > 0) {
+      // Verify file exists in ground truth
+      const safeFile = uiModule.files.find((f: string) => ground_truth_paths.includes(f));
+      return safeFile || null;
+    }
+
+    return null;
+  }
+
+  private suggestNewFilePath(modules?: any[], packageManager?: string, ground_truth_paths?: string[]): string {
+    // Suggest based on existing structure
+    if (modules && modules.length > 0) {
+      const componentModule = modules.find(m => m.name.toLowerCase().includes('component'));
+      if (componentModule && componentModule.files && componentModule.files.length > 0) {
+        const basePath = componentModule.files[0].split('/').slice(0, -1).join('/');
+        return `${basePath}/MyFeature${packageManager?.includes('npm') ? '.tsx' : '.py'}`;
+      }
+    }
+
+    // Default suggestions
+    if (packageManager === 'npm' || packageManager === 'yarn' || packageManager === 'pnpm') {
+      return 'src/components/MyFeature.tsx';
+    } else if (packageManager === 'pip' || packageManager === 'poetry') {
+      return 'src/my_feature.py';
+    }
+
+    return 'src/MyFeature.js';
+  }
+
+  private generateSkeletonCode(filePath: string, packageManager?: string): string {
+    const isReact = filePath.endsWith('.tsx') || filePath.endsWith('.jsx');
+    const isPython = filePath.endsWith('.py');
+
+    if (isReact) {
+      return `import React from 'react';
+
+export const MyFeature = () => {
+  return (
+    <div className="my-feature">
+      <h2>My New Feature</h2>
+      <p>This is a new feature I built!</p>
+    </div>
+  );
+};`;
+    } else if (isPython) {
+      return `def my_feature():
+    """
+    A new feature I built
+    """
+    return "Hello from my feature"`;
+    } else {
+      return `export function myFeature() {
+  console.log('My new feature');
+  return 'Hello from my feature';
+}`;
+    }
   }
 
   /**
