@@ -67,17 +67,31 @@ OUTPUT REQUIREMENTS:
    */
   private createTutorial(repoData: RepoSnapshot, analysisData: any): string {
     const { metadata } = repoData;
-    const { tech_stack, core_modules, important_files, summary, main_features } = analysisData;
+    const { 
+      repo_name, 
+      package_manager, 
+      dev_commands, 
+      entry_points, 
+      main_concepts, 
+      modules, 
+      explain_terms 
+    } = analysisData;
 
-    const difficultyLevel = this.determineDifficulty(tech_stack, core_modules);
-    const prerequisites = this.generatePrerequisites(tech_stack);
-    const learningPath = this.generateInteractiveLearningPath(tech_stack, core_modules, important_files);
+    const difficultyLevel = this.determineDifficulty(main_concepts, modules);
+    const prerequisites = this.generatePrerequisites(main_concepts, package_manager);
+    const learningPath = this.generateInteractiveLearningPath(
+      main_concepts, 
+      modules, 
+      entry_points, 
+      dev_commands,
+      package_manager
+    );
 
     const learningJourney = {
-      project_title: metadata?.name || 'Repository Learning Journey',
-      overview: summary || metadata?.description || 'Master this project through hands-on learning and experimentation.',
+      project_title: repo_name || metadata?.name || 'Repository Learning Journey',
+      overview: `Master ${repo_name || 'this project'} through hands-on learning. ${metadata?.description || 'Understand the architecture, run it locally, and build your own features.'}`,
       difficulty_level: difficultyLevel,
-      estimated_duration: this.estimateDuration(core_modules?.length || 0),
+      estimated_duration: this.estimateDuration(modules?.length || 0),
       prerequisites: prerequisites,
       learning_objectives: [
         'Understand how the project works',
@@ -101,19 +115,19 @@ OUTPUT REQUIREMENTS:
   }
 
   /**
-   * Determine difficulty level based on tech stack complexity
+   * Determine difficulty level based on concepts complexity
    */
-  private determineDifficulty(tech_stack?: string[], core_modules?: any[]): string {
-    if (!tech_stack) return 'beginner';
+  private determineDifficulty(main_concepts?: string[], modules?: any[]): string {
+    if (!main_concepts) return 'beginner';
     
-    const advancedTech = ['Rust', 'Go', 'Kubernetes', 'WebAssembly'];
-    const hasAdvanced = tech_stack.some(t => advancedTech.includes(t));
+    const advancedConcepts = ['GraphQL', 'WebSocket', 'Middleware', 'SSR'];
+    const hasAdvanced = main_concepts.some(c => advancedConcepts.includes(c));
     
-    if (hasAdvanced || (core_modules && core_modules.length > 10)) {
+    if (hasAdvanced || (modules && modules.length > 10)) {
       return 'advanced';
     }
     
-    if (core_modules && core_modules.length > 5) {
+    if (modules && modules.length > 5) {
       return 'intermediate';
     }
     
@@ -130,27 +144,30 @@ OUTPUT REQUIREMENTS:
   }
 
   /**
-   * Generate prerequisites based on tech stack
+   * Generate prerequisites based on concepts and package manager
    */
-  private generatePrerequisites(tech_stack?: string[]): string[] {
+  private generatePrerequisites(main_concepts?: string[], packageManager?: string): string[] {
     const prerequisites: string[] = ['Basic programming knowledge', 'Git fundamentals'];
     
-    if (!tech_stack) return prerequisites;
+    if (!main_concepts) return prerequisites;
     
-    if (tech_stack.includes('JavaScript') || tech_stack.includes('TypeScript')) {
-      prerequisites.push('JavaScript basics');
+    // Based on package manager
+    if (packageManager === 'npm' || packageManager === 'yarn' || packageManager === 'pnpm') {
+      prerequisites.push('JavaScript/Node.js basics');
     }
-    if (tech_stack.includes('React') || tech_stack.includes('Vue.js') || tech_stack.includes('Angular')) {
-      prerequisites.push('Understanding of component-based UI');
-    }
-    if (tech_stack.includes('Python')) {
+    if (packageManager === 'pip' || packageManager === 'poetry') {
       prerequisites.push('Python basics');
     }
-    if (tech_stack.includes('Node.js') || tech_stack.includes('Express.js')) {
-      prerequisites.push('Node.js fundamentals');
+    
+    // Based on concepts
+    if (main_concepts.includes('Component-based UI')) {
+      prerequisites.push('Understanding of component architecture');
     }
-    if (tech_stack.includes('TypeScript')) {
-      prerequisites.push('TypeScript knowledge (helpful but not required)');
+    if (main_concepts.includes('REST API') || main_concepts.includes('GraphQL')) {
+      prerequisites.push('API concepts');
+    }
+    if (main_concepts.includes('State Management')) {
+      prerequisites.push('State management patterns (helpful)');
     }
     
     return prerequisites;
@@ -160,13 +177,18 @@ OUTPUT REQUIREMENTS:
    * Generate interactive learning path with stages
    */
   private generateInteractiveLearningPath(
-    tech_stack?: string[],
-    core_modules?: any[],
-    important_files?: any[]
+    main_concepts?: string[],
+    modules?: any[],
+    entry_points?: string[],
+    dev_commands?: any,
+    packageManager?: string
   ): any[] {
     const path: any[] = [];
 
     // Stage 1: Setup & Run
+    const installCmd = dev_commands?.install || 'unknown';
+    const runCmd = dev_commands?.run || 'unknown';
+    
     path.push({
       stage: 'Setup & Run',
       goal: 'Get the project running locally',
@@ -174,26 +196,28 @@ OUTPUT REQUIREMENTS:
       steps: [
         'Clone the repository to your local machine',
         'Read the README.md for setup instructions',
-        'Install dependencies using the package manager',
-        'Run the development server and verify it works'
+        `Install dependencies: ${installCmd}`,
+        `Run the development server: ${runCmd}`
       ],
       checkpoint: 'You can successfully run the project and see the output in your browser or terminal',
       quiz: [
         {
-          question: 'Which command typically installs dependencies in this project?',
-          options: ['npm install', 'pip install', 'yarn install', 'depends on tech stack'],
-          answer: tech_stack?.includes('Python') ? 'pip install' : 'npm install'
+          question: 'Which command installs dependencies in this project?',
+          options: [installCmd, 'pip install', 'npm install', 'yarn install'].filter((v, i, a) => a.indexOf(v) === i),
+          answer: installCmd
         }
       ]
     });
 
     // Stage 2: Architecture & Core Logic
+    const entryFile = entry_points && entry_points.length > 0 ? entry_points[0] : 'the entry point file';
+    
     path.push({
       stage: 'Architecture & Core Logic',
       goal: 'Understand how main components interact',
-      concepts: ['code architecture', 'data flow', 'component relationships'],
+      concepts: main_concepts?.slice(0, 3) || ['code architecture', 'data flow'],
       steps: [
-        'Identify the entry point file (e.g., index.js, main.py, App.tsx)',
+        `Open ${entryFile} to understand the app initialization`,
         'Trace the main data flow through the application',
         'Map out how different modules communicate',
         'Document the architecture in a simple diagram'
@@ -203,16 +227,16 @@ OUTPUT REQUIREMENTS:
     });
 
     // Stage 3: Feature Exploration
-    const firstModule = core_modules && core_modules.length > 0 ? core_modules[0] : null;
+    const firstModule = modules && modules.length > 0 ? modules[0] : null;
     path.push({
       stage: 'Feature Exploration',
       goal: 'Experiment with modifying a core feature',
       concepts: ['code modification', 'testing changes', 'debugging'],
       steps: [
         firstModule ? `Open the ${firstModule.name} module` : 'Choose a main component to modify',
+        firstModule ? `Explore files: ${firstModule.files.slice(0, 2).join(', ')}` : 'Pick a file to modify',
         'Make a small change (e.g., update text, change a color, modify logic)',
-        'Run the project and verify your change appears',
-        'Use browser DevTools or debugger to inspect the change'
+        `Run ${runCmd} and verify your change appears`
       ],
       checkpoint: 'You successfully modified a feature and confirmed the result',
       mini_challenge: 'Add a new button or function that logs user interaction to the console.'

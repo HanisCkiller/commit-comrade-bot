@@ -8,13 +8,41 @@ class CodeAnalyzerAgent {
   private config: AgentConfig = {
     name: 'CodeAnalyzer',
     role: 'Analyze repository structure and content',
-    systemPrompt: `You are CodeAnalyzer.
-Given a JSON repo snapshot, analyze the project structure.
-Identify:
-- The tech stack (frontend/backend/frameworks)
-- Core modules and their purpose
-- Key files and what they do
-Return a JSON summary for the next Agent.`,
+    systemPrompt: `You are a senior codebase analyst.
+Given a repo snapshot (readme, tree, keyfiles with content_head, run_commands, package_manager),
+produce a STRICT JSON with these keys:
+
+{
+  "repo_name": "owner/name",
+  "package_manager": "npm|yarn|pnpm|pip|poetry|unknown",
+  "dev_commands": {
+    "install": "...",
+    "run": "...",
+    "test": "..."
+  },
+  "entry_points": ["path/to/file1", "path/to/file2"],
+  "main_concepts": ["SSR","REST API","state management"],
+  "modules": [
+    {
+      "name": "Human-readable module name",
+      "files": ["path/a.ts","path/b.tsx"],
+      "purpose": "what this module does in 1-2 lines",
+      "key_symbols": ["functionA","class B","hook useX"]
+    }
+  ],
+  "data_flow_edges": [{"from":"fileA.ts","to":"fileB.ts","why":"brief reason"}],
+  "explain_terms": [
+    {"term":"npm","definition":"Node package manager used to install dependencies"},
+    {"term":"pip","definition":"Python package installer"}
+  ],
+  "ground_truth_paths": ["all/paths/that/exist/in/repo"]
+}
+
+Rules:
+- Only include files that exist in ground_truth_paths.
+- Prefer entry points and files shown in keyfiles.
+- Infer commands conservatively; if unknown, set to "unknown" not a guess.
+- No markdown. JSON only.`,
   };
 
   getConfig(): AgentConfig {
@@ -49,224 +77,276 @@ Return a JSON summary for the next Agent.`,
   }
 
   /**
-   * Perform analysis on the repository snapshot
+   * Perform analysis on the repository snapshot - New format
    */
-  private performAnalysis(repoSnapshot: RepoSnapshot): {
-    tech_stack: string[];
-    core_modules: Array<{ name: string; purpose: string }>;
-    important_files: Array<{ file: string; description: string }>;
-    summary: string;
-  } {
+  private performAnalysis(repoSnapshot: RepoSnapshot): any {
     const { readme, fileTree, keyFiles, metadata } = repoSnapshot;
 
-    // Analyze tech stack
-    const tech_stack = this.detectTechStack(fileTree, keyFiles, readme);
+    // Extract ground truth paths
+    const ground_truth_paths = fileTree || [];
 
-    // Identify core modules
-    const core_modules = this.identifyCoreModules(fileTree, keyFiles);
+    // Detect package manager
+    const package_manager = this.detectPackageManager(fileTree, keyFiles);
 
-    // Find important files
-    const important_files = this.findImportantFiles(fileTree, keyFiles);
+    // Get dev commands
+    const dev_commands = this.inferDevCommands(package_manager, keyFiles);
 
-    // Generate summary
-    const summary = this.generateSummary(metadata, tech_stack, core_modules);
+    // Find entry points
+    const entry_points = this.findEntryPoints(fileTree, keyFiles);
+
+    // Detect main concepts
+    const main_concepts = this.detectMainConcepts(fileTree, keyFiles, readme);
+
+    // Build modules list
+    const modules = this.buildModules(fileTree, keyFiles);
+
+    // Infer data flow edges
+    const data_flow_edges = this.inferDataFlowEdges(modules, entry_points);
+
+    // Generate term explanations
+    const explain_terms = this.generateTermExplanations(package_manager, main_concepts);
 
     return {
-      tech_stack,
-      core_modules,
-      important_files,
-      summary,
+      repo_name: metadata?.name || 'unknown/repo',
+      package_manager,
+      dev_commands,
+      entry_points,
+      main_concepts,
+      modules,
+      data_flow_edges,
+      explain_terms,
+      ground_truth_paths,
     };
   }
 
   /**
-   * Detect technology stack from file patterns and content
+   * Detect package manager from files
    */
-  private detectTechStack(
-    fileTree?: string[],
-    keyFiles?: Record<string, string>,
-    readme?: string
-  ): string[] {
-    const techStack = new Set<string>();
+  private detectPackageManager(fileTree?: string[], keyFiles?: Record<string, string>): string {
+    if (!fileTree) return 'unknown';
 
-    // Check for common files and patterns
-    const fileTreeStr = fileTree?.join(' ').toLowerCase() || '';
-    const keyFilesStr = JSON.stringify(keyFiles || {}).toLowerCase();
-    const readmeStr = readme?.toLowerCase() || '';
-
-    const allContent = `${fileTreeStr} ${keyFilesStr} ${readmeStr}`;
-
-    // Frontend frameworks
-    if (allContent.includes('react') || allContent.includes('.jsx') || allContent.includes('.tsx')) {
-      techStack.add('React');
-    }
-    if (allContent.includes('vue')) techStack.add('Vue.js');
-    if (allContent.includes('angular')) techStack.add('Angular');
-    if (allContent.includes('svelte')) techStack.add('Svelte');
-    if (allContent.includes('next')) techStack.add('Next.js');
-
-    // Backend frameworks
-    if (allContent.includes('express')) techStack.add('Express.js');
-    if (allContent.includes('django')) techStack.add('Django');
-    if (allContent.includes('flask')) techStack.add('Flask');
-    if (allContent.includes('rails')) techStack.add('Ruby on Rails');
-    if (allContent.includes('spring')) techStack.add('Spring Boot');
-
-    // Languages
-    if (allContent.includes('.ts') || allContent.includes('typescript')) {
-      techStack.add('TypeScript');
-    }
-    if (allContent.includes('.js') || allContent.includes('javascript')) {
-      techStack.add('JavaScript');
-    }
-    if (allContent.includes('.py') || allContent.includes('python')) {
-      techStack.add('Python');
-    }
-    if (allContent.includes('.java')) techStack.add('Java');
-    if (allContent.includes('.go')) techStack.add('Go');
-    if (allContent.includes('.rb') || allContent.includes('ruby')) {
-      techStack.add('Ruby');
-    }
-
-    // Build tools
-    if (allContent.includes('webpack')) techStack.add('Webpack');
-    if (allContent.includes('vite')) techStack.add('Vite');
-    if (allContent.includes('rollup')) techStack.add('Rollup');
-
-    // Databases
-    if (allContent.includes('postgres') || allContent.includes('postgresql')) {
-      techStack.add('PostgreSQL');
-    }
-    if (allContent.includes('mongo')) techStack.add('MongoDB');
-    if (allContent.includes('mysql')) techStack.add('MySQL');
-    if (allContent.includes('redis')) techStack.add('Redis');
-
-    // Testing
-    if (allContent.includes('jest')) techStack.add('Jest');
-    if (allContent.includes('pytest')) techStack.add('Pytest');
-    if (allContent.includes('mocha')) techStack.add('Mocha');
-
-    return Array.from(techStack);
+    const fileTreeStr = fileTree.join(' ').toLowerCase();
+    
+    if (fileTreeStr.includes('package-lock.json')) return 'npm';
+    if (fileTreeStr.includes('yarn.lock')) return 'yarn';
+    if (fileTreeStr.includes('pnpm-lock.yaml')) return 'pnpm';
+    if (fileTreeStr.includes('poetry.lock') || fileTreeStr.includes('pyproject.toml')) return 'poetry';
+    if (fileTreeStr.includes('requirements.txt') || fileTreeStr.includes('pipfile')) return 'pip';
+    
+    return 'unknown';
   }
 
   /**
-   * Identify core modules based on directory structure
+   * Infer development commands based on package manager
    */
-  private identifyCoreModules(
-    fileTree?: string[],
-    keyFiles?: Record<string, string>
-  ): Array<{ name: string; purpose: string }> {
-    const modules: Array<{ name: string; purpose: string }> = [];
-
-    if (!fileTree) return modules;
-
-    // Common module patterns
-    const modulePatterns = {
-      'src/components': 'UI Components',
-      'components': 'UI Components',
-      'src/services': 'Business Logic Services',
-      'services': 'Business Logic Services',
-      'src/utils': 'Utility Functions',
-      'utils': 'Utility Functions',
-      'src/api': 'API Integration',
-      'api': 'API Layer',
-      'src/models': 'Data Models',
-      'models': 'Data Models',
-      'src/controllers': 'Request Controllers',
-      'controllers': 'Request Controllers',
-      'src/views': 'View Templates',
-      'views': 'View Templates',
-      'src/store': 'State Management',
-      'store': 'State Management',
-      'src/hooks': 'Custom React Hooks',
-      'hooks': 'Custom Hooks',
-      'src/pages': 'Application Pages',
-      'pages': 'Application Pages',
-      'tests': 'Test Suite',
-      'test': 'Test Suite',
+  private inferDevCommands(packageManager: string, keyFiles?: Record<string, string>): {
+    install: string;
+    run: string;
+    test: string;
+  } {
+    const commands = {
+      npm: { install: 'npm install', run: 'npm run dev', test: 'npm test' },
+      yarn: { install: 'yarn install', run: 'yarn dev', test: 'yarn test' },
+      pnpm: { install: 'pnpm install', run: 'pnpm dev', test: 'pnpm test' },
+      pip: { install: 'pip install -r requirements.txt', run: 'python main.py', test: 'pytest' },
+      poetry: { install: 'poetry install', run: 'poetry run python main.py', test: 'poetry run pytest' },
     };
 
-    for (const [pattern, purpose] of Object.entries(modulePatterns)) {
-      const hasModule = fileTree.some(file => file.includes(pattern));
-      if (hasModule) {
-        modules.push({ name: pattern, purpose });
-      }
-    }
-
-    return modules;
+    return commands[packageManager as keyof typeof commands] || {
+      install: 'unknown',
+      run: 'unknown',
+      test: 'unknown',
+    };
   }
 
   /**
-   * Find and describe important files
+   * Find entry point files
    */
-  private findImportantFiles(
-    fileTree?: string[],
-    keyFiles?: Record<string, string>
-  ): Array<{ file: string; description: string }> {
-    const importantFiles: Array<{ file: string; description: string }> = [];
+  private findEntryPoints(fileTree?: string[], keyFiles?: Record<string, string>): string[] {
+    if (!fileTree) return [];
 
-    if (!fileTree) return importantFiles;
+    const entryPatterns = [
+      'index.js', 'index.ts', 'index.tsx', 'index.jsx',
+      'main.js', 'main.ts', 'main.tsx', 'main.py',
+      'app.js', 'app.ts', 'app.tsx', 'app.py',
+      'server.js', 'server.ts',
+      'src/index', 'src/main', 'src/app',
+    ];
 
-    const importantPatterns: Record<string, string> = {
-      'package.json': 'NPM package configuration and dependencies',
-      'requirements.txt': 'Python dependencies',
-      'Dockerfile': 'Docker container configuration',
-      'docker-compose.yml': 'Docker compose orchestration',
-      '.env': 'Environment variables',
-      'config': 'Configuration files',
-      'tsconfig.json': 'TypeScript configuration',
-      'webpack.config': 'Webpack bundler configuration',
-      'vite.config': 'Vite build configuration',
-      'README.md': 'Project documentation',
-      'index.html': 'Main HTML entry point',
-      'main.': 'Application entry point',
-      'app.': 'Main application file',
-      'server.': 'Server entry point',
-    };
-
+    const entries: string[] = [];
     for (const file of fileTree) {
-      for (const [pattern, description] of Object.entries(importantPatterns)) {
+      for (const pattern of entryPatterns) {
         if (file.toLowerCase().includes(pattern.toLowerCase())) {
-          importantFiles.push({ file, description });
+          entries.push(file);
           break;
         }
       }
     }
 
-    return importantFiles.slice(0, 10); // Limit to top 10
+    return entries.slice(0, 5); // Limit to top 5
   }
 
   /**
-   * Generate a summary of the repository
+   * Detect main concepts from codebase
    */
-  private generateSummary(
-    metadata?: RepoSnapshot['metadata'],
-    tech_stack?: string[],
-    core_modules?: Array<{ name: string; purpose: string }>
-  ): string {
-    let summary = '';
+  private detectMainConcepts(fileTree?: string[], keyFiles?: Record<string, string>, readme?: string): string[] {
+    const concepts = new Set<string>();
+    const allContent = `${fileTree?.join(' ') || ''} ${JSON.stringify(keyFiles || {})} ${readme || ''}`.toLowerCase();
 
-    if (metadata) {
-      summary += `${metadata.name} is a ${metadata.language || 'software'} project`;
-      if (metadata.description) {
-        summary += `: ${metadata.description}`;
-      }
-      summary += '. ';
+    // Architecture patterns
+    if (allContent.includes('ssr') || allContent.includes('server-side')) concepts.add('SSR');
+    if (allContent.includes('api') || allContent.includes('endpoint')) concepts.add('REST API');
+    if (allContent.includes('graphql')) concepts.add('GraphQL');
+    if (allContent.includes('websocket')) concepts.add('WebSocket');
+    
+    // State management
+    if (allContent.includes('redux') || allContent.includes('zustand') || allContent.includes('state')) {
+      concepts.add('State Management');
     }
-
-    if (tech_stack && tech_stack.length > 0) {
-      summary += `The project uses ${tech_stack.slice(0, 5).join(', ')}. `;
-    }
-
-    if (core_modules && core_modules.length > 0) {
-      summary += `Key modules include ${core_modules
-        .slice(0, 3)
-        .map(m => m.name)
-        .join(', ')}. `;
-    }
-
-    return summary || 'Repository analysis completed.';
+    
+    // UI patterns
+    if (allContent.includes('component')) concepts.add('Component-based UI');
+    if (allContent.includes('routing') || allContent.includes('router')) concepts.add('Routing');
+    
+    // Backend patterns
+    if (allContent.includes('middleware')) concepts.add('Middleware');
+    if (allContent.includes('authentication') || allContent.includes('auth')) concepts.add('Authentication');
+    if (allContent.includes('database') || allContent.includes('db')) concepts.add('Database');
+    
+    return Array.from(concepts).slice(0, 8);
   }
+
+  /**
+   * Build structured modules list
+   */
+  private buildModules(fileTree?: string[], keyFiles?: Record<string, string>): any[] {
+    if (!fileTree) return [];
+
+    const moduleMap = new Map<string, any>();
+
+    // Define module patterns
+    const patterns = {
+      'components': { name: 'UI Components', purpose: 'Reusable UI building blocks' },
+      'services': { name: 'Business Services', purpose: 'Core business logic and external integrations' },
+      'utils': { name: 'Utility Functions', purpose: 'Helper functions and utilities' },
+      'api': { name: 'API Layer', purpose: 'Backend API endpoints and routes' },
+      'pages': { name: 'Application Pages', purpose: 'Top-level page components and views' },
+      'hooks': { name: 'Custom Hooks', purpose: 'Reusable React hooks for state and side effects' },
+      'models': { name: 'Data Models', purpose: 'Data structures and schemas' },
+      'controllers': { name: 'Controllers', purpose: 'Request handlers and business logic' },
+      'store': { name: 'State Store', purpose: 'Global state management' },
+    };
+
+    for (const [pattern, info] of Object.entries(patterns)) {
+      const files = fileTree.filter(f => f.toLowerCase().includes(`/${pattern}/`) || f.toLowerCase().includes(`\\${pattern}\\`));
+      
+      if (files.length > 0) {
+        moduleMap.set(pattern, {
+          name: info.name,
+          files: files.slice(0, 5), // Limit files per module
+          purpose: info.purpose,
+          key_symbols: this.extractKeySymbols(files, keyFiles),
+        });
+      }
+    }
+
+    return Array.from(moduleMap.values());
+  }
+
+  /**
+   * Extract key symbols from files (functions, classes, etc.)
+   */
+  private extractKeySymbols(files: string[], keyFiles?: Record<string, string>): string[] {
+    const symbols: string[] = [];
+    
+    // Simple heuristic: extract from filenames
+    files.slice(0, 3).forEach(file => {
+      const filename = file.split('/').pop()?.replace(/\.(ts|tsx|js|jsx|py)$/, '');
+      if (filename) {
+        symbols.push(filename);
+      }
+    });
+
+    return symbols.slice(0, 5);
+  }
+
+  /**
+   * Infer data flow edges between modules
+   */
+  private inferDataFlowEdges(modules: any[], entry_points: string[]): any[] {
+    const edges: any[] = [];
+
+    // Simple heuristic: entry points flow to pages, pages to components
+    if (entry_points.length > 0 && modules.length > 1) {
+      const entryFile = entry_points[0];
+      const pagesModule = modules.find(m => m.name.toLowerCase().includes('page'));
+      
+      if (pagesModule && pagesModule.files.length > 0) {
+        edges.push({
+          from: entryFile,
+          to: pagesModule.files[0],
+          why: 'Entry point initializes and renders pages',
+        });
+      }
+
+      const componentsModule = modules.find(m => m.name.toLowerCase().includes('component'));
+      if (pagesModule && componentsModule && componentsModule.files.length > 0) {
+        edges.push({
+          from: pagesModule.files[0],
+          to: componentsModule.files[0],
+          why: 'Pages compose and render UI components',
+        });
+      }
+    }
+
+    return edges;
+  }
+
+  /**
+   * Generate explanations for technical terms
+   */
+  private generateTermExplanations(packageManager: string, concepts: string[]): any[] {
+    const terms: any[] = [];
+
+    // Package manager explanations
+    const pmExplanations: Record<string, string> = {
+      npm: 'Node Package Manager - default package manager for Node.js projects',
+      yarn: 'Fast, reliable package manager alternative to npm',
+      pnpm: 'Performant npm - disk space efficient package manager',
+      pip: 'Python package installer for managing Python libraries',
+      poetry: 'Python dependency management and packaging tool',
+    };
+
+    if (packageManager !== 'unknown' && pmExplanations[packageManager]) {
+      terms.push({
+        term: packageManager,
+        definition: pmExplanations[packageManager],
+      });
+    }
+
+    // Concept explanations
+    const conceptDefs: Record<string, string> = {
+      'SSR': 'Server-Side Rendering - rendering pages on the server before sending to client',
+      'REST API': 'Representational State Transfer - architectural style for web services',
+      'GraphQL': 'Query language for APIs providing efficient data fetching',
+      'State Management': 'Managing and synchronizing application state across components',
+      'Component-based UI': 'Building UIs from reusable, self-contained components',
+      'Authentication': 'Verifying user identity and managing access control',
+      'Middleware': 'Software layer that processes requests between client and server',
+    };
+
+    concepts.forEach(concept => {
+      if (conceptDefs[concept]) {
+        terms.push({
+          term: concept,
+          definition: conceptDefs[concept],
+        });
+      }
+    });
+
+    return terms;
+  }
+
 }
 
 // Export singleton instance
