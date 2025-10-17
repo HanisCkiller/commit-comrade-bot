@@ -33,7 +33,14 @@ export const TutorialGenerator = () => {
     try {
       // Step 1: RepoCrawler Agent
       setCurrentAgent("RepoCrawler Agent - Fetching repository data...");
-      toast.info("🧠 RepoCrawler Agent is analyzing the repository");
+      toast.info("🧠 RepoCrawler Agent is fetching repository data");
+      
+      // Simulate delay to show agent status
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Step 2: CodeAnalyzer Agent
+      setCurrentAgent("CodeAnalyzer Agent - Analyzing repository structure...");
+      toast.info("📊 CodeAnalyzer Agent is analyzing the codebase");
       
       // Use the multi-agent orchestrator
       const result = await agentOrchestrator.generateTutorial(repoUrl);
