@@ -1,5 +1,7 @@
 import { Header } from "@/components/Header";
 import { TutorialGenerator } from "@/components/TutorialGenerator";
+import { StepByStepLearning } from "@/components/StepByStepLearning";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Index = () => {
   return (
@@ -18,8 +20,21 @@ const Index = () => {
             </p>
           </div>
 
-          {/* Main Generator Component */}
-          <TutorialGenerator />
+          {/* Main Content with Tabs */}
+          <Tabs defaultValue="example" className="w-full">
+            <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
+              <TabsTrigger value="example">Example Project</TabsTrigger>
+              <TabsTrigger value="generate">Generate Tutorial</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="example" className="mt-6">
+              <StepByStepLearning />
+            </TabsContent>
+            
+            <TabsContent value="generate" className="mt-6">
+              <TutorialGenerator />
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
     </div>
