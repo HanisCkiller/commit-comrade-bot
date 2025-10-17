@@ -97,47 +97,189 @@ HARD CONSTRAINTS:
   }
 
   /**
-   * Create a hands-on curriculum in JSON format
+   * Create a step-by-step tutorial in simplified format
    */
   private createTutorial(repoData: RepoSnapshot, analysisData: any): string {
-    const { metadata, keyFiles } = repoData;
+    const { metadata } = repoData;
     const { 
       repo_name, 
       package_manager, 
       dev_commands, 
       entry_points, 
       main_concepts, 
-      modules, 
-      explain_terms,
-      data_flow_edges,
-      ground_truth_paths
+      modules
     } = analysisData;
 
-    const difficultyLevel = this.determineDifficulty(main_concepts, modules);
-    const prerequisites = this.generatePrerequisites(main_concepts, package_manager);
-    const glossary = this.buildGlossary(explain_terms, package_manager, main_concepts);
-    const learningPath = this.generateDetailedLearningPath(
-      main_concepts, 
-      modules, 
-      entry_points, 
-      dev_commands,
-      package_manager,
-      data_flow_edges,
-      ground_truth_paths,
-      keyFiles
-    );
+    const projectTitle = repo_name || metadata?.name || 'Repository Learning Journey';
+    const overview = `Master ${projectTitle} through hands-on learning. ${metadata?.description || 'Understand the architecture, run it locally, and build your own features.'}`;
+    const steps = this.generateStepByStepPath(repoData, analysisData);
 
-    const curriculum = {
-      project_title: repo_name || metadata?.name || 'Repository Learning Journey',
-      overview: `Master ${repo_name || 'this project'} through hands-on learning. ${metadata?.description || 'Understand the architecture, run it locally, and build your own features.'}`,
-      difficulty_level: difficultyLevel,
-      estimated_duration: this.estimateDuration(modules?.length || 0),
-      prerequisites: prerequisites,
-      glossary: glossary,
-      learning_path: learningPath,
+    const tutorial = {
+      project_title: projectTitle,
+      overview,
+      steps
     };
 
-    return JSON.stringify(curriculum, null, 2);
+    return JSON.stringify(tutorial, null, 2);
+  }
+
+  /**
+   * Generate simplified step-by-step path
+   */
+  private generateStepByStepPath(repoData: RepoSnapshot, analysisData: any): any[] {
+    const { dev_commands, entry_points, modules, package_manager, main_concepts } = analysisData;
+    const steps: any[] = [];
+    let stepNumber = 1;
+
+    // Step 1: Setup
+    steps.push({
+      id: `step${stepNumber}`,
+      number: stepNumber++,
+      title: "Clone and Setup Environment",
+      description: `Set up your local development environment using ${package_manager || 'package manager'}`,
+      difficulty: "very-easy",
+      isCritical: true,
+      detail: {
+        task: `Clone the repository and install all required dependencies using ${package_manager || 'the package manager'}.`,
+        expectedResult: `You should see a successful installation message. Running the dev command should start the application.`,
+        codeExample: this.generateSetupCommands(package_manager, dev_commands),
+        tips: [
+          `Make sure you have ${package_manager || 'the package manager'} installed`,
+          "Check for any environment variables needed in .env files",
+          "Verify all dependencies installed without errors"
+        ]
+      }
+    });
+
+    // Step 2: Understand structure
+    if (entry_points && entry_points.length > 0) {
+      const mainEntryPoint = entry_points[0];
+      steps.push({
+        id: `step${stepNumber}`,
+        number: stepNumber++,
+        title: "Understand the Project Structure",
+        description: "Learn the architecture and main entry points",
+        difficulty: "easy",
+        detail: {
+          task: `Explore the project structure. The main entry point is at ${mainEntryPoint}. Understand how the application bootstraps.`,
+          expectedResult: "You should be able to trace the execution flow from the entry point through the main modules.",
+          codeExample: this.generateFileTree(modules),
+          tips: [
+            `Start by reading ${mainEntryPoint}`,
+            "Identify the main modules and their responsibilities",
+            "Draw a simple diagram of component relationships"
+          ]
+        }
+      });
+    }
+
+    // Step 3: Run the application
+    steps.push({
+      id: `step${stepNumber}`,
+      number: stepNumber++,
+      title: "Run the Application",
+      description: "Start the development server and verify it works",
+      difficulty: "easy",
+      isCritical: true,
+      detail: {
+        task: `Run the development server using the command provided. Verify the application starts without errors.`,
+        expectedResult: "The application should start successfully and be accessible in your browser or terminal.",
+        codeExample: dev_commands?.run || "npm run dev",
+        testCase: "Check the console output for any errors. Try accessing the application's main interface.",
+        tips: [
+          "Check what port the application runs on",
+          "Look for startup logs to confirm successful launch",
+          "Try the basic features to ensure everything works"
+        ]
+      }
+    });
+
+    // Step 4: Explore key modules
+    if (modules && modules.length > 0) {
+      const keyModule = modules[0];
+      steps.push({
+        id: `step${stepNumber}`,
+        number: stepNumber++,
+        title: `Explore ${keyModule.name || 'Core Module'}`,
+        description: keyModule.purpose || "Learn how this module works",
+        difficulty: "medium",
+        detail: {
+          task: `Study the ${keyModule.name} module. Understand its purpose: ${keyModule.purpose}`,
+          expectedResult: "You should understand how this module fits into the overall architecture and what it's responsible for.",
+          codeExample: this.generateModuleExample(keyModule),
+          tips: [
+            "Look for the main functions or classes in this module",
+            "Trace how data flows in and out",
+            "Identify any external dependencies"
+          ]
+        }
+      });
+    }
+
+    // Step 5: Make a simple modification
+    steps.push({
+      id: `step${stepNumber}`,
+      number: stepNumber++,
+      title: "Make Your First Modification",
+      description: "Add a small feature or modify existing behavior",
+      difficulty: "medium",
+      isCritical: true,
+      detail: {
+        task: "Make a simple, safe modification to the codebase. This could be adding a log statement, changing a text string, or adding a simple function.",
+        expectedResult: "Your changes should be reflected when you run the application. The app should still work correctly.",
+        codeExample: "// Add your modification here\nconsole.log('My first change!');\n\n// Or modify a simple value\nconst greeting = 'Hello from my modified code!';",
+        testCase: "Run the application and verify your changes are visible. Make sure nothing broke.",
+        tips: [
+          "Start with non-critical code areas",
+          "Test immediately after making changes",
+          "Use version control to easily revert if needed",
+          "Document what you changed and why"
+        ]
+      }
+    });
+
+    return steps;
+  }
+
+  private generateSetupCommands(packageManager: string | undefined, devCommands: any): string {
+    const installCmd = devCommands?.install || `${packageManager || 'npm'} install`;
+    const runCmd = devCommands?.run || `${packageManager || 'npm'} run dev`;
+    
+    return `# Clone the repository
+git clone <repository-url>
+cd <project-directory>
+
+# Install dependencies
+${installCmd}
+
+# Start development server
+${runCmd}`;
+  }
+
+  private generateFileTree(modules: any[]): string {
+    if (!modules || modules.length === 0) {
+      return "src/\n├── index.ts\n└── ...";
+    }
+
+    let tree = "src/\n";
+    modules.slice(0, 5).forEach((module, idx) => {
+      const isLast = idx === Math.min(modules.length, 5) - 1;
+      const prefix = isLast ? "└──" : "├──";
+      tree += `${prefix} ${module.name || `module${idx + 1}`}/\n`;
+      if (module.files && module.files.length > 0) {
+        module.files.slice(0, 2).forEach((file: string) => {
+          tree += `${isLast ? "    " : "│   "}├── ${file.split('/').pop()}\n`;
+        });
+      }
+    });
+    return tree;
+  }
+
+  private generateModuleExample(module: any): string {
+    if (module.key_symbols && module.key_symbols.length > 0) {
+      return `// Key symbols in this module:\n// ${module.key_symbols.join(', ')}\n\n// Purpose: ${module.purpose}\n\n// Files:\n${module.files?.slice(0, 3).map((f: string) => `// - ${f}`).join('\n') || '// (files not specified)'}`;
+    }
+    return `// Module: ${module.name}\n// Purpose: ${module.purpose}\n// Explore the files in this module to understand its implementation.`;
   }
 
   /**
