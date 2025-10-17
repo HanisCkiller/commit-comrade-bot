@@ -7,15 +7,25 @@ import type { AgentConfig, AgentResponse, RepoSnapshot } from '@/types/agents';
 class TeacherAgent {
   private config: AgentConfig = {
     name: 'Teacher',
-    role: 'Generate educational tutorials from analysis',
-    systemPrompt: `You are an AI teacher. 
-Using the analysis JSON, generate a detailed tutorial in Markdown format.
-Include:
-- Overview
-- Tech Stack
-- Key Modules
-- Learning Path
-- 2 practice exercises`,
+    role: 'Generate interactive learning journeys',
+    systemPrompt: `You are CodeSensei 🥷 — a wise AI coding mentor who transforms open-source repositories into immersive, hands-on learning journeys.
+
+Your goal: Teach the user to **understand, modify, and master** this repository step by step — just like Codecrafters or Buildspace.
+
+Design a **structured Learning Journey** for a developer who wants to master this project *by building and experimenting*, not just reading.
+
+Generate a **JSON output** that represents a full interactive course with stages, checkpoints, quizzes, and mini-challenges.
+
+STYLE:
+- Use concise but encouraging language.
+- Avoid overwhelming details; focus on learning by doing.
+- Each stage should feel like a mini-level in a coding game.
+- Use terminology accessible to junior developers.
+
+OUTPUT REQUIREMENTS:
+- Strictly output valid JSON (no Markdown, no commentary).
+- Keep learning_path around 3–5 stages.
+- Include quizzes and mini-challenges for engagement.`,
   };
 
   getConfig(): AgentConfig {
@@ -53,117 +63,177 @@ Include:
   }
 
   /**
-   * Create a comprehensive educational tutorial
+   * Create an interactive learning journey in JSON format
    */
   private createTutorial(repoData: RepoSnapshot, analysisData: any): string {
-    const { metadata, readme, fileTree, keyFiles } = repoData;
-    const { tech_stack, core_modules, important_files, summary } = analysisData;
+    const { metadata } = repoData;
+    const { tech_stack, core_modules, important_files, summary, main_features } = analysisData;
 
-    let tutorial = '';
+    const difficultyLevel = this.determineDifficulty(tech_stack, core_modules);
+    const prerequisites = this.generatePrerequisites(tech_stack);
+    const learningPath = this.generateInteractiveLearningPath(tech_stack, core_modules, important_files);
 
-    // Title
-    tutorial += `# 📚 Tutorial: ${metadata?.name || 'Repository'}\n\n`;
+    const learningJourney = {
+      project_title: metadata?.name || 'Repository Learning Journey',
+      overview: summary || metadata?.description || 'Master this project through hands-on learning and experimentation.',
+      difficulty_level: difficultyLevel,
+      estimated_duration: this.estimateDuration(core_modules?.length || 0),
+      prerequisites: prerequisites,
+      learning_objectives: [
+        'Understand how the project works',
+        'Run it locally and explore the codebase',
+        'Modify key components and features',
+        'Implement a small new feature independently'
+      ],
+      learning_path: learningPath,
+      final_project: {
+        goal: 'Apply all learned concepts to extend the app meaningfully',
+        description: 'Add a new feature that integrates with the existing codebase (e.g., new UI component, API endpoint, or utility function).',
+        expected_learning: [
+          'Full understanding of the repository structure',
+          'Confidence modifying and extending open-source code',
+          'Ability to read, trace, and refactor complex codebases'
+        ]
+      }
+    };
 
-    // Project Overview
-    tutorial += `## 🎯 Project Overview\n\n`;
-    tutorial += `${summary || metadata?.description || 'A software project for learning and exploration.'}\n\n`;
+    return JSON.stringify(learningJourney, null, 2);
+  }
+
+  /**
+   * Determine difficulty level based on tech stack complexity
+   */
+  private determineDifficulty(tech_stack?: string[], core_modules?: any[]): string {
+    if (!tech_stack) return 'beginner';
     
-    if (metadata) {
-      tutorial += `### Repository Stats\n\n`;
-      tutorial += `- **Primary Language**: ${metadata.language}\n`;
-      tutorial += `- **Stars**: ${metadata.stars} ⭐\n`;
-      tutorial += `- **Forks**: ${metadata.forks} 🍴\n`;
-      tutorial += `- **Community**: ${this.getCommunitySize(metadata.stars)}\n\n`;
+    const advancedTech = ['Rust', 'Go', 'Kubernetes', 'WebAssembly'];
+    const hasAdvanced = tech_stack.some(t => advancedTech.includes(t));
+    
+    if (hasAdvanced || (core_modules && core_modules.length > 10)) {
+      return 'advanced';
     }
-
-    // Tech Stack Explanation
-    if (tech_stack && tech_stack.length > 0) {
-      tutorial += `## 🛠️ Tech Stack\n\n`;
-      tutorial += `This project leverages the following technologies:\n\n`;
-      
-      const categorized = this.categorizeTechStack(tech_stack);
-      
-      if (categorized.languages.length > 0) {
-        tutorial += `### Programming Languages\n`;
-        categorized.languages.forEach(tech => {
-          tutorial += `- **${tech}**: ${this.getTechDescription(tech)}\n`;
-        });
-        tutorial += '\n';
-      }
-
-      if (categorized.frameworks.length > 0) {
-        tutorial += `### Frameworks & Libraries\n`;
-        categorized.frameworks.forEach(tech => {
-          tutorial += `- **${tech}**: ${this.getTechDescription(tech)}\n`;
-        });
-        tutorial += '\n';
-      }
-
-      if (categorized.tools.length > 0) {
-        tutorial += `### Build Tools & Others\n`;
-        categorized.tools.forEach(tech => {
-          tutorial += `- **${tech}**: ${this.getTechDescription(tech)}\n`;
-        });
-        tutorial += '\n';
-      }
+    
+    if (core_modules && core_modules.length > 5) {
+      return 'intermediate';
     }
+    
+    return 'beginner';
+  }
 
-    // Key Modules
-    if (core_modules && core_modules.length > 0) {
-      tutorial += `## 📦 Key Modules\n\n`;
-      tutorial += `Understanding the project structure:\n\n`;
-      
-      core_modules.forEach((module: any, index: number) => {
-        tutorial += `### ${index + 1}. ${module.name}\n\n`;
-        tutorial += `**Purpose**: ${module.purpose}\n\n`;
-        tutorial += this.getModuleLearningTip(module.name) + '\n\n';
-      });
+  /**
+   * Estimate duration based on project size
+   */
+  private estimateDuration(moduleCount: number): string {
+    if (moduleCount > 10) return '4-6 hours';
+    if (moduleCount > 5) return '2-3 hours';
+    return '1-2 hours';
+  }
+
+  /**
+   * Generate prerequisites based on tech stack
+   */
+  private generatePrerequisites(tech_stack?: string[]): string[] {
+    const prerequisites: string[] = ['Basic programming knowledge', 'Git fundamentals'];
+    
+    if (!tech_stack) return prerequisites;
+    
+    if (tech_stack.includes('JavaScript') || tech_stack.includes('TypeScript')) {
+      prerequisites.push('JavaScript basics');
     }
+    if (tech_stack.includes('React') || tech_stack.includes('Vue.js') || tech_stack.includes('Angular')) {
+      prerequisites.push('Understanding of component-based UI');
+    }
+    if (tech_stack.includes('Python')) {
+      prerequisites.push('Python basics');
+    }
+    if (tech_stack.includes('Node.js') || tech_stack.includes('Express.js')) {
+      prerequisites.push('Node.js fundamentals');
+    }
+    if (tech_stack.includes('TypeScript')) {
+      prerequisites.push('TypeScript knowledge (helpful but not required)');
+    }
+    
+    return prerequisites;
+  }
 
-    // Important Files Walkthrough
-    if (important_files && important_files.length > 0) {
-      tutorial += `## 📄 Key Files Walkthrough\n\n`;
-      
-      important_files.forEach((file: any) => {
-        tutorial += `### \`${file.file}\`\n\n`;
-        tutorial += `${file.description}\n\n`;
-        
-        // Add specific content if available in keyFiles
-        if (keyFiles && keyFiles[file.file]) {
-          const content = keyFiles[file.file];
-          const preview = content.split('\n').slice(0, 10).join('\n');
-          tutorial += '```\n' + preview;
-          if (content.split('\n').length > 10) {
-            tutorial += '\n... (truncated)';
-          }
-          tutorial += '\n```\n\n';
+  /**
+   * Generate interactive learning path with stages
+   */
+  private generateInteractiveLearningPath(
+    tech_stack?: string[],
+    core_modules?: any[],
+    important_files?: any[]
+  ): any[] {
+    const path: any[] = [];
+
+    // Stage 1: Setup & Run
+    path.push({
+      stage: 'Setup & Run',
+      goal: 'Get the project running locally',
+      concepts: ['installation', 'dependency management', 'environment setup'],
+      steps: [
+        'Clone the repository to your local machine',
+        'Read the README.md for setup instructions',
+        'Install dependencies using the package manager',
+        'Run the development server and verify it works'
+      ],
+      checkpoint: 'You can successfully run the project and see the output in your browser or terminal',
+      quiz: [
+        {
+          question: 'Which command typically installs dependencies in this project?',
+          options: ['npm install', 'pip install', 'yarn install', 'depends on tech stack'],
+          answer: tech_stack?.includes('Python') ? 'pip install' : 'npm install'
         }
-      });
-    }
+      ]
+    });
 
-    // Learning Path
-    tutorial += `## 🎓 Learning Path\n\n`;
-    tutorial += `Follow this path to understand the project:\n\n`;
-    tutorial += this.generateLearningPath(tech_stack, core_modules);
+    // Stage 2: Architecture & Core Logic
+    path.push({
+      stage: 'Architecture & Core Logic',
+      goal: 'Understand how main components interact',
+      concepts: ['code architecture', 'data flow', 'component relationships'],
+      steps: [
+        'Identify the entry point file (e.g., index.js, main.py, App.tsx)',
+        'Trace the main data flow through the application',
+        'Map out how different modules communicate',
+        'Document the architecture in a simple diagram'
+      ],
+      checkpoint: 'You can explain the project architecture and main data flow',
+      mini_challenge: 'Add a console.log or print statement in a key function and verify it executes when you interact with the app.'
+    });
 
-    // Practice Exercises
-    tutorial += `## 💪 Practice Exercises\n\n`;
-    tutorial += this.generateExercises(metadata?.name, tech_stack, core_modules);
+    // Stage 3: Feature Exploration
+    const firstModule = core_modules && core_modules.length > 0 ? core_modules[0] : null;
+    path.push({
+      stage: 'Feature Exploration',
+      goal: 'Experiment with modifying a core feature',
+      concepts: ['code modification', 'testing changes', 'debugging'],
+      steps: [
+        firstModule ? `Open the ${firstModule.name} module` : 'Choose a main component to modify',
+        'Make a small change (e.g., update text, change a color, modify logic)',
+        'Run the project and verify your change appears',
+        'Use browser DevTools or debugger to inspect the change'
+      ],
+      checkpoint: 'You successfully modified a feature and confirmed the result',
+      mini_challenge: 'Add a new button or function that logs user interaction to the console.'
+    });
 
-    // Additional Resources
-    tutorial += `## 📚 Additional Resources\n\n`;
-    tutorial += this.generateResources(tech_stack);
+    // Stage 4: Build Your Own
+    path.push({
+      stage: 'Build Your Own',
+      goal: 'Create a small new feature from scratch',
+      concepts: ['feature implementation', 'code organization', 'best practices'],
+      steps: [
+        'Plan a small addition (like a new component, function, or route)',
+        'Follow the existing code patterns and conventions',
+        'Implement your feature step by step',
+        'Test it thoroughly and document what you built'
+      ],
+      checkpoint: 'You build a working mini-feature using what you learned',
+      final_challenge: 'Build a feature that interacts with existing code (e.g., a new UI element that uses existing data or a utility function).'
+    });
 
-    // Footer
-    tutorial += `---\n\n`;
-    tutorial += `*Tutorial generated by CodeSensei Multi-Agent System*\n\n`;
-    tutorial += `🤖 **Agents Used**:\n`;
-    tutorial += `- 🧠 RepoCrawler: Fetched repository data via MCP\n`;
-    tutorial += `- 📊 CodeAnalyzer: Analyzed structure and tech stack\n`;
-    tutorial += `- 👨‍🏫 Teacher: Generated educational content\n\n`;
-    tutorial += `Happy Learning! 🚀\n`;
-
-    return tutorial;
+    return path;
   }
 
   /**
