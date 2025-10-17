@@ -112,10 +112,15 @@ export const TutorialGenerator = () => {
 
           {/* Agent Status */}
           {isGenerating && currentAgent && (
-            <div className="pt-2 border-t border-border/50">
-              <div className="flex items-center gap-2 text-sm">
-                <Brain className="w-4 h-4 text-primary animate-pulse" />
-                <span className="text-muted-foreground">{currentAgent}</span>
+            <div className="pt-4 border-t border-border/50">
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                <Brain className="w-5 h-5 text-primary animate-pulse" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-foreground">{currentAgent}</p>
+                  <div className="mt-2 h-1 bg-secondary rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-primary to-accent animate-pulse" style={{ width: '60%' }} />
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -139,32 +144,36 @@ export const TutorialGenerator = () => {
 
       {/* Tutorial Output */}
       {tutorial && (
-        <Card className="p-6 bg-card border-border">
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 pb-4 border-b border-border">
-              <FileText className="w-5 h-5 text-primary" />
-              <h2 className="text-lg font-semibold">Generated Tutorial</h2>
+        <Card className="p-8 bg-card border-border shadow-xl">
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 pb-6 border-b border-border">
+              <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
+                <FileText className="w-6 h-6 text-primary" />
+              </div>
+              <h2 className="text-2xl font-semibold gradient-text">Generated Tutorial</h2>
             </div>
-            <div className="prose prose-invert max-w-none">
+            <div className="prose prose-invert max-w-none prose-headings:gradient-text prose-a:text-primary prose-code:text-primary">
               <ReactMarkdown 
                 remarkPlugins={[remarkGfm]}
                 components={{
-                  h1: ({node, ...props}) => <h1 className="text-3xl font-bold mb-4 gradient-text" {...props} />,
-                  h2: ({node, ...props}) => <h2 className="text-2xl font-bold mt-8 mb-3 text-foreground" {...props} />,
-                  h3: ({node, ...props}) => <h3 className="text-xl font-semibold mt-6 mb-2 text-foreground" {...props} />,
-                  p: ({node, ...props}) => <p className="text-muted-foreground mb-4 leading-relaxed" {...props} />,
-                  ul: ({node, ...props}) => <ul className="list-disc list-inside space-y-2 mb-4 text-muted-foreground" {...props} />,
-                  ol: ({node, ...props}) => <ol className="list-decimal list-inside space-y-2 mb-4 text-muted-foreground" {...props} />,
-                  li: ({node, ...props}) => <li className="ml-4" {...props} />,
+                  h1: ({node, ...props}) => <h1 className="text-4xl font-bold mb-6 gradient-text" {...props} />,
+                  h2: ({node, ...props}) => <h2 className="text-3xl font-bold mt-12 mb-4 text-foreground flex items-center gap-2" {...props} />,
+                  h3: ({node, ...props}) => <h3 className="text-2xl font-semibold mt-8 mb-3 text-foreground" {...props} />,
+                  p: ({node, ...props}) => <p className="text-muted-foreground mb-4 leading-relaxed text-base" {...props} />,
+                  ul: ({node, ...props}) => <ul className="list-disc list-inside space-y-2 mb-4 text-muted-foreground ml-4" {...props} />,
+                  ol: ({node, ...props}) => <ol className="list-decimal list-inside space-y-2 mb-4 text-muted-foreground ml-4" {...props} />,
+                  li: ({node, ...props}) => <li className="ml-2" {...props} />,
                   code: ({node, inline, ...props}: any) => 
                     inline ? (
-                      <code className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono text-sm" {...props} />
+                      <code className="px-2 py-1 rounded bg-primary/10 text-primary font-mono text-sm border border-primary/20" {...props} />
                     ) : (
-                      <code className="block p-4 rounded-lg bg-secondary/50 border border-border font-mono text-sm overflow-x-auto" {...props} />
+                      <code className="block p-6 rounded-lg bg-secondary/50 border border-border font-mono text-sm overflow-x-auto leading-relaxed" {...props} />
                     ),
-                  pre: ({node, ...props}) => <pre className="mb-4" {...props} />,
+                  pre: ({node, ...props}) => <pre className="mb-6 rounded-lg overflow-hidden" {...props} />,
                   strong: ({node, ...props}) => <strong className="font-semibold text-foreground" {...props} />,
-                  em: ({node, ...props}) => <em className="italic text-foreground" {...props} />,
+                  em: ({node, ...props}) => <em className="italic text-foreground/90" {...props} />,
+                  blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-primary pl-4 italic text-muted-foreground my-4" {...props} />,
+                  hr: ({node, ...props}) => <hr className="my-8 border-border" {...props} />,
                 }}
               >
                 {tutorial}

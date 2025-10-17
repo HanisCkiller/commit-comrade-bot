@@ -57,6 +57,9 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+    background-image: 
+      radial-gradient(at 0% 0%, hsl(var(--primary) / 0.08) 0, transparent 50%),
+      radial-gradient(at 100% 100%, hsl(var(--accent) / 0.06) 0, transparent 50%);
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -68,6 +71,13 @@ All colors MUST be HSL.
   .gradient-text {
     @apply bg-clip-text text-transparent;
     background-image: var(--gradient-primary);
+    animation: gradient-shimmer 3s ease-in-out infinite;
+    background-size: 200% 200%;
+  }
+
+  @keyframes gradient-shimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
   }
 
   .gradient-border {
