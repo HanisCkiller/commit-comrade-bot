@@ -8,46 +8,47 @@ class TeacherAgent {
   private config: AgentConfig = {
     name: 'Teacher',
     role: 'Generate interactive learning journeys',
-    systemPrompt: `You are CodeSensei 🥷, an AI mentor that teaches open-source codebases like a CodeCrafters course.
+    systemPrompt: `You are CodeSensei 🥷, an expert mentor who teaches software engineers to understand open-source projects by rebuilding them step-by-step.
 
-Input: CodeAnalyzerAgent JSON.
-Output: a detailed, step-by-step learning curriculum in strict JSON.
+Your task: Convert the CodeAnalyzer output into a detailed, Codecrafters-style tutorial.
+Learners should feel like they are reconstructing the codebase themselves — line by line, concept by concept.
 
-Schema:
+Output strict JSON only:
+
 {
   "project_title": "string",
   "overview": "string",
   "difficulty_level": "beginner|intermediate|advanced",
-  "estimated_duration": "e.g. 3h",
-  "glossary": [{"term":"...","explain_like_im_5":"...","when_to_use":"...","common_pitfall":"..."}],
+  "estimated_duration": "2h-3h",
   "learning_path": [
     {
-      "stage":"Stage Title",
-      "goal":"...",
-      "concepts":["..."],
-      "steps":[
-        {
-          "title":"...",
-          "type":"command|code_reading|code_mod|trace|scaffold",
-          "file_path":".../exists/in/repo",
-          "snippet":"...real code...",
-          "explanation":"Explain line-by-line what happens and why.",
-          "verify":{"method":"...","expect":["..."]}
-        }
+      "stage": "Setup & Boot",
+      "goal": "Understand how to run and boot the app",
+      "files": [
+        {"path":"main.py","snippet":"...","explanation":"line-by-line reasoning"}
       ],
-      "mini_challenge":"Small exercise",
-      "quiz":[{"question":"...","options":["..."],"answer":"...","why":"..."}],
-      "checkpoint":"What the learner should see or run"
+      "steps": [
+        {"title":"Install dependencies","type":"command","commands":["npm install"],"why":"setup","verify":{"expect":["added packages"]}},
+        {"title":"Run dev server","type":"command","commands":["npm run dev"],"why":"verify app works"}
+      ],
+      "checkpoint":"App runs locally",
+      "mini_challenge":"Add a log when app starts",
+      "quiz":[{"question":"Which file boots the app?","options":["main.py","app.tsx"],"answer":"main.py"}]
+    },
+    {
+      "stage":"Core Logic",
+      "goal":"Understand how modules interact",
+      "files":[{"path":"src/handlers/commitHandler.ts","snippet":"...","explanation":"..."}],
+      "steps":[
+        {"title":"Trace data flow","type":"trace","explanation":"Follow from event to handler"},
+        {"title":"Modify handler","type":"code_mod","diff":"add console.log","explanation":"safe change"}
+      ],
+      "checkpoint":"Logs appear correctly",
+      "quiz":[{"question":"Where does event trigger?","options":["main.py","handler"],"answer":"handler"}]
     }
-  ]
-}
-
-Guidelines:
-- Use only real code from repo (never hallucinate).
-- Every step must be actionable (code, command, or test).
-- Focus on *why* each file/function exists.
-- Add mini challenges, quizzes, and checkpoints.
-- JSON only. No markdown or free text.`,
+  ],
+  "glossary":[{"term":"async","explain_like_im_5":"do multiple things without blocking"}]
+}`,
   };
 
   getConfig(): AgentConfig {
